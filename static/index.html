@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VedioZip 转码工具</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="badge">VedioZip</p>
+      <h1>Windows 本地视频压缩转换</h1>
+      <p class="subtitle">支持选择单个文件或整个文件夹，配置输出目录和清晰度，并实时查看转换进度。</p>
+    </section>
+
+    <section class="panel">
+      <div class="field-grid">
+        <label class="field">
+          <span>输入文件</span>
+          <div class="inline-controls">
+            <input id="sourceFile" type="text" placeholder="请选择视频文件" readonly />
+            <button id="pickFileBtn" type="button">选择文件</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>输入文件夹</span>
+          <div class="inline-controls">
+            <input id="sourceFolder" type="text" placeholder="请选择视频文件夹" readonly />
+            <button id="pickFolderBtn" type="button">选择文件夹</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>输出目录</span>
+          <div class="inline-controls">
+            <input id="outputDir" type="text" placeholder="请选择转换后保存目录" readonly />
+            <button id="pickOutputBtn" type="button">选择输出目录</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>目标清晰度</span>
+          <select id="height">
+            <option value="240">240p</option>
+            <option value="320" selected>320p</option>
+            <option value="360">360p</option>
+            <option value="480">480p</option>
+            <option value="720">720p</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>CRF（质量）</span>
+          <input id="crf" type="number" min="0" max="51" value="23" />
+        </label>
+
+        <label class="field">
+          <span>Preset（速度）</span>
+          <select id="preset">
+            <option>ultrafast</option>
+            <option>superfast</option>
+            <option>veryfast</option>
+            <option>faster</option>
+            <option selected>medium</option>
+            <option>slow</option>
+            <option>slower</option>
+            <option>veryslow</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>音频码率</span>
+          <select id="audioBitrate">
+            <option>64k</option>
+            <option>96k</option>
+            <option selected>128k</option>
+            <option>160k</option>
+            <option>192k</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="startBtn" type="button" class="primary">开始转换</button>
+      </div>
+    </section>
+
+    <section class="panel status">
+      <div class="status-row">
+        <span class="status-label">状态</span>
+        <span id="statusText">等待开始</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">当前文件</span>
+        <span id="currentFile">-</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">进度</span>
+        <span id="progressText">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

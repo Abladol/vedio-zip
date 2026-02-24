@@ -2,6 +2,9 @@ name: vediozip-ffmpeg
 channels:
   - conda-forge
 dependencies:
+  - fastapi
   - ffmpeg
   - ffmpeg-python
+  - pyinstaller
   - python
+  - uvicorn
