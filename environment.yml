@@ -1,0 +1,7 @@
+name: vediozip-ffmpeg
+channels:
+  - conda-forge
+dependencies:
+  - ffmpeg
+  - ffmpeg-python
+  - python
