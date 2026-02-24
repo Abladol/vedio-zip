@@ -8,12 +8,14 @@ import time
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal
 
 from app_logging import get_log_file_path, get_logger
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".m4v"}
 WINDOWS_DLL_NOT_FOUND_EXIT = 0xC0000135
+INVALID_SUFFIX_CHARS = '<>:"/\\|?*'
+SuffixMode = Literal["default", "none", "custom"]
 
 
 @dataclass
@@ -29,6 +31,8 @@ class JobState:
     processed_files: int
     current_file: str | None
     error: str | None
+    suffix_mode: str
+    custom_suffix: str
     created_at: float
     updated_at: float
 
@@ -50,6 +54,8 @@ class VideoConvertService:
         crf: int,
         preset: str,
         audio_bitrate: str,
+        suffix_mode: SuffixMode = "default",
+        custom_suffix: str = "",
     ) -> str:
         source = Path(source_path).expanduser().resolve()
         target_dir = Path(output_dir).expanduser().resolve()
@@ -60,6 +66,11 @@ class VideoConvertService:
             raise ValueError(f"输出目录不存在: {target_dir}")
         if not target_dir.is_dir():
             raise ValueError(f"输出路径不是目录: {target_dir}")
+
+        if suffix_mode not in {"default", "none", "custom"}:
+            raise ValueError(f"不支持的后缀模式: {suffix_mode}")
+
+        suffix_text = self._build_suffix_text(height=height, suffix_mode=suffix_mode, custom_suffix=custom_suffix)
 
         files = self._collect_source_files(source)
         if not files:
@@ -84,6 +95,8 @@ class VideoConvertService:
             processed_files=0,
             current_file=None,
             error=None,
+            suffix_mode=suffix_mode,
+            custom_suffix=custom_suffix,
             created_at=now,
             updated_at=now,
         )
@@ -91,18 +104,32 @@ class VideoConvertService:
             self._jobs[job_id] = job
 
         self._logger.info(
-            "Create job. job_id=%s files=%s source=%s output=%s ffmpeg=%s ffprobe=%s",
+            "Create job. job_id=%s files=%s source=%s output=%s ffmpeg=%s ffprobe=%s suffix_mode=%s suffix_text=%s",
             job_id,
             len(files),
             source,
             target_dir,
             ffmpeg_path,
             ffprobe_path,
+            suffix_mode,
+            suffix_text,
         )
 
         worker = threading.Thread(
             target=self._run_job,
-            args=(job_id, source, target_dir, files, ffmpeg_path, ffprobe_path, height, crf, preset, audio_bitrate),
+            args=(
+                job_id,
+                source,
+                target_dir,
+                files,
+                ffmpeg_path,
+                ffprobe_path,
+                height,
+                crf,
+                preset,
+                audio_bitrate,
+                suffix_text,
+            ),
             daemon=True,
             name=f"convert-{job_id[:8]}",
         )
@@ -113,6 +140,24 @@ class VideoConvertService:
         with self._lock:
             job = self._jobs.get(job_id)
             return None if job is None else job.to_dict()
+
+    def _sanitize_custom_suffix(self, suffix: str) -> str:
+        cleaned = suffix.strip()
+        for char in INVALID_SUFFIX_CHARS:
+            cleaned = cleaned.replace(char, "_")
+        cleaned = cleaned.rstrip(". ")
+        return cleaned
+
+    def _build_suffix_text(self, height: int, suffix_mode: SuffixMode, custom_suffix: str) -> str:
+        if suffix_mode == "none":
+            return ""
+        if suffix_mode == "default":
+            return f"_{height}p"
+
+        sanitized = self._sanitize_custom_suffix(custom_suffix)
+        if not sanitized:
+            raise ValueError("自定义后缀不能为空。")
+        return sanitized if sanitized.startswith("_") else f"_{sanitized}"
 
     def _run_job(
         self,
@@ -126,6 +171,7 @@ class VideoConvertService:
         crf: int,
         preset: str,
         audio_bitrate: str,
+        suffix_text: str,
     ) -> None:
         self._update_job(job_id, status="running", message="正在转换", progress=0.0)
         self._logger.info("Job start. job_id=%s", job_id)
@@ -138,7 +184,12 @@ class VideoConvertService:
 
         try:
             for index, input_file in enumerate(files):
-                output_file = self._build_output_path(source_root, input_file, output_dir, height)
+                output_file = self._build_output_path(
+                    source_root=source_root,
+                    input_file=input_file,
+                    output_dir=output_dir,
+                    suffix_text=suffix_text,
+                )
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 duration = durations[index]
 
@@ -212,11 +263,18 @@ class VideoConvertService:
             return [source]
         return sorted(path for path in source.rglob("*") if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS)
 
-    def _build_output_path(self, source_root: Path, input_file: Path, output_dir: Path, height: int) -> Path:
+    def _build_output_path(
+        self,
+        source_root: Path,
+        input_file: Path,
+        output_dir: Path,
+        suffix_text: str,
+    ) -> Path:
+        output_name = f"{input_file.stem}{suffix_text}.mp4"
         if source_root.is_file():
-            return output_dir / f"{input_file.stem}_{height}p.mp4"
+            return output_dir / output_name
         relative = input_file.relative_to(source_root)
-        return output_dir / relative.parent / f"{relative.stem}_{height}p.mp4"
+        return output_dir / relative.parent / output_name
 
     def _resolve_tool_path(self, tool_name: str) -> Path | None:
         candidates: list[Path] = []

@@ -4,6 +4,8 @@ const pickSourceBtn = document.getElementById("pickSourceBtn");
 const pickOutputBtn = document.getElementById("pickOutputBtn");
 const outputDirEl = document.getElementById("outputDir");
 const heightEl = document.getElementById("height");
+const suffixModeEl = document.getElementById("suffixMode");
+const customSuffixEl = document.getElementById("customSuffix");
 const crfEl = document.getElementById("crf");
 const presetEl = document.getElementById("preset");
 const audioBitrateEl = document.getElementById("audioBitrate");
@@ -29,6 +31,14 @@ function getSourceType() {
 function updateSourcePlaceholder() {
   const sourceType = getSourceType();
   sourcePathEl.placeholder = sourceType === "source_file" ? "请选择视频文件" : "请选择视频文件夹";
+}
+
+function updateSuffixControls() {
+  const isCustom = suffixModeEl.value === "custom";
+  customSuffixEl.disabled = !isCustom;
+  if (!isCustom) {
+    customSuffixEl.value = "";
+  }
 }
 
 async function postJson(url, payload) {
@@ -58,6 +68,8 @@ function setRunningState(running) {
   sourceTypeEls.forEach((el) => {
     el.disabled = running;
   });
+  suffixModeEl.disabled = running;
+  customSuffixEl.disabled = running || suffixModeEl.value !== "custom";
 }
 
 async function pickPath(kind, targetEl) {
@@ -121,6 +133,10 @@ sourceTypeEls.forEach((el) => {
   });
 });
 
+suffixModeEl.addEventListener("change", () => {
+  updateSuffixControls();
+});
+
 startBtn.addEventListener("click", async () => {
   const sourcePath = sourcePathEl.value;
   const outputDir = outputDirEl.value;
@@ -131,6 +147,10 @@ startBtn.addEventListener("click", async () => {
   }
   if (!outputDir) {
     showError("请先选择输出目录");
+    return;
+  }
+  if (suffixModeEl.value === "custom" && !customSuffixEl.value.trim()) {
+    showError("请填写自定义后缀");
     return;
   }
 
@@ -147,6 +167,8 @@ startBtn.addEventListener("click", async () => {
       crf: Number(crfEl.value),
       preset: presetEl.value,
       audio_bitrate: audioBitrateEl.value,
+      suffix_mode: suffixModeEl.value,
+      custom_suffix: customSuffixEl.value.trim(),
     };
 
     const job = await postJson("/api/start", payload);
@@ -164,3 +186,4 @@ startBtn.addEventListener("click", async () => {
 });
 
 updateSourcePlaceholder();
+updateSuffixControls();

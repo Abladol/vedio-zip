@@ -24,7 +24,7 @@ def _resolve_static_dir() -> Path:
         base = Path(__file__).resolve().parent
     static_dir = base / "static"
     if not static_dir.exists():
-        raise RuntimeError(f"静态资源目录不存在: {static_dir}")
+        raise RuntimeError(f"Static directory not found: {static_dir}")
     return static_dir
 
 
@@ -37,12 +37,14 @@ class PickPathRequest(BaseModel):
 
 
 class StartJobRequest(BaseModel):
-    source_path: str = Field(..., description="输入文件或文件夹路径")
-    output_dir: str = Field(..., description="输出目录")
+    source_path: str = Field(..., description="Input file or folder path")
+    output_dir: str = Field(..., description="Output directory")
     height: int = Field(320, ge=120, le=2160)
     crf: int = Field(23, ge=0, le=51)
     preset: str = Field("medium")
     audio_bitrate: str = Field("128k")
+    suffix_mode: Literal["default", "none", "custom"] = Field("default")
+    custom_suffix: str = Field("")
 
 
 def _pick_path(kind: str) -> str:
@@ -87,13 +89,15 @@ async def pick_path(request: PickPathRequest) -> dict:
 @app.post("/api/start")
 def start_job(request: StartJobRequest) -> dict:
     logger.info(
-        "Start job request. source=%s output=%s height=%s crf=%s preset=%s audio=%s",
+        "Start job request. source=%s output=%s height=%s crf=%s preset=%s audio=%s suffix_mode=%s custom_suffix=%s",
         request.source_path,
         request.output_dir,
         request.height,
         request.crf,
         request.preset,
         request.audio_bitrate,
+        request.suffix_mode,
+        request.custom_suffix,
     )
     try:
         job_id = service.start_job(
@@ -103,6 +107,8 @@ def start_job(request: StartJobRequest) -> dict:
             crf=request.crf,
             preset=request.preset,
             audio_bitrate=request.audio_bitrate,
+            suffix_mode=request.suffix_mode,
+            custom_suffix=request.custom_suffix,
         )
     except ValueError as exc:
         logger.warning("Start job validation failed: %s", exc)

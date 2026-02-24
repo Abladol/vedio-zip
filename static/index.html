@@ -54,6 +54,20 @@
         </label>
 
         <label class="field">
+          <span>文件后缀策略</span>
+          <select id="suffixMode">
+            <option value="default" selected>默认（按清晰度追加，如 320p）</option>
+            <option value="none">空（不追加后缀）</option>
+            <option value="custom">自定义</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>自定义后缀</span>
+          <input id="customSuffix" type="text" placeholder="例如：mobile（输出为 _mobile）" disabled />
+        </label>
+
+        <label class="field">
           <span>CRF（质量）</span>
           <input id="crf" type="number" min="0" max="51" value="23" />
         </label>

@@ -9,6 +9,7 @@ VedioZip is an open-source Windows video conversion tool with a local web UI.
 - Convert a single video file or a whole folder
 - Choose output directory
 - Set target resolution (for example: 320p)
+- Output suffix mode: default by resolution / no suffix / custom suffix
 - Configure CRF, preset, and audio bitrate
 - Real-time conversion progress
 - Portable `.exe` and installer package support
