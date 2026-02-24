@@ -1,0 +1,73 @@
+name: Build And Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          activate-environment: vediozip-ffmpeg
+          environment-file: environment.yml
+          auto-activate-base: false
+          python-version: "3.14"
+
+      - name: Build Portable App
+        shell: powershell
+        run: .\build_windows.ps1
+
+      - name: Prepare Portable Zip
+        shell: powershell
+        run: |
+          $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}".TrimStart("v") } else { "dev-${{ github.run_number }}" }
+          $portableName = "VedioZip-portable-win64-$version.zip"
+          Compress-Archive -Path dist\* -DestinationPath $portableName -Force
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PORTABLE=$portableName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
+
+      - name: Build Installer
+        shell: powershell
+        run: .\build_installer.ps1 $env:VERSION
+
+      - name: Rename Installer
+        shell: powershell
+        run: |
+          $installer = Get-ChildItem installer\Output\VedioZip-Setup-*.exe | Select-Object -First 1
+          $target = "VedioZip-setup-win64-$env:VERSION.exe"
+          Copy-Item $installer.FullName $target -Force
+          "INSTALLER=$target" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vediozip-release-assets
+          path: |
+            ${{ env.PORTABLE }}
+            ${{ env.INSTALLER }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.PORTABLE }}
+            ${{ env.INSTALLER }}
+          generate_release_notes: true

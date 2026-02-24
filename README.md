@@ -1,61 +1,101 @@
 # VedioZip
 
-本项目是一个可在 Windows 本地运行的视频转换工具，采用前后端分离结构：
-- 前端：`static/` 下的网页界面（路径选择、参数设置、进度条）
-- 后端：FastAPI 服务（任务管理、转码执行、进度查询）
+VedioZip is an open-source Windows video conversion tool.
 
-## 功能
-- 选择单个视频文件转换
-- 选择整个文件夹批量转换（递归扫描常见视频格式）
-- 选择输出目录
-- 自定义目标清晰度（默认 320p）
-- 自定义编码参数（CRF、Preset、音频码率）
-- 显示转换状态和进度条
+- Full source code is included in this repository.
+- You can run from source in one command.
+- You can also download a portable executable or installer from GitHub Releases.
 
-## 项目结构
-- `launcher.py`：应用入口，启动本地服务并自动打开浏览器
-- `server.py`：FastAPI 接口与静态页面托管
-- `video_service.py`：转换任务管理与 ffmpeg 进度解析
-- `static/`：前端页面（HTML/CSS/JS）
-- `build_windows.ps1`：Windows 一键打包脚本
-- `run_dev.ps1`：开发环境一键运行脚本
-- `convert.py`：命令行转换脚本（保留）
+## Source Code
 
-## 环境安装
+- Backend API: `server.py`
+- Conversion engine: `video_service.py`
+- App launcher: `launcher.py`
+- Frontend UI: `static/`
+- Build scripts:
+  - `build_windows.ps1` (portable exe)
+  - `build_installer.ps1` (installer exe)
+- CI release workflow: `.github/workflows/release.yml`
+
+## Quick Start (Run from source)
+
+1. Create or update environment:
+
 ```powershell
 conda env update -n vediozip-ffmpeg -f environment.yml --prune
 ```
 
-如果你还没有该环境：
-```powershell
-conda env create -f environment.yml
-```
+2. Start app:
 
-## 本地运行（前后端）
 ```powershell
 .\run_dev.ps1
 ```
 
-或：
-```powershell
-conda run -n vediozip-ffmpeg python launcher.py
-```
+The app opens in your browser automatically.
 
-启动后会自动打开浏览器页面。
+## Download and Use (No development environment required)
 
-## Windows 一键打包
+Go to **GitHub Releases** and download either:
+
+- `VedioZip-portable-win64-<version>.zip`
+  - Unzip and run `VedioZip.exe`
+- `VedioZip-setup-win64-<version>.exe`
+  - Run installer and start from Start Menu/Desktop shortcut
+
+## How to Use in App
+
+1. Choose input file or input folder.
+2. Choose output folder.
+3. Set target resolution (for example 320p).
+4. Click **Start Conversion**.
+5. Check real-time progress and current file status.
+
+## Build Portable Exe (Local)
+
 ```powershell
 .\build_windows.ps1
 ```
 
-打包后输出在 `dist/`：
+Output:
+
 - `dist/VedioZip.exe`
 - `dist/ffmpeg.exe`
 - `dist/ffprobe.exe`
 
-双击 `VedioZip.exe` 即可运行。
+## Build Installer Exe (Local)
 
-## 接口说明（简要）
-- `POST /api/pick-path`：打开系统对话框选择输入/输出路径
-- `POST /api/start`：创建并启动转换任务
-- `GET /api/jobs/{job_id}`：查询任务进度与状态
+Install Inno Setup first:
+
+```powershell
+choco install innosetup -y
+```
+
+Then build installer:
+
+```powershell
+.\build_installer.ps1 1.0.0
+```
+
+Output:
+
+- `installer/Output/VedioZip-Setup-1.0.0.exe`
+
+## Automated Release
+
+When you push a tag like `v1.0.0`, GitHub Actions will:
+
+1. Build portable executable.
+2. Build installer executable.
+3. Create a GitHub Release.
+4. Upload both files to Release assets.
+
+Example:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+## License
+
+MIT
