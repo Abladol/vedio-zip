@@ -75,8 +75,26 @@ body {
   font-size: 0.95rem;
 }
 
+.field-span-2 {
+  grid-column: 1 / -1;
+}
+
 .field span {
   font-weight: 700;
+}
+
+.source-type {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.source-type label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 input,

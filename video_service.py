@@ -10,7 +10,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
+from app_logging import get_log_file_path, get_logger
+
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".m4v"}
+WINDOWS_DLL_NOT_FOUND_EXIT = 0xC0000135
 
 
 @dataclass
@@ -35,6 +38,7 @@ class JobState:
 
 class VideoConvertService:
     def __init__(self) -> None:
+        self._logger = get_logger("vediozip.video_service")
         self._jobs: dict[str, JobState] = {}
         self._lock = threading.Lock()
 
@@ -64,7 +68,7 @@ class VideoConvertService:
         ffmpeg_path = self._resolve_tool_path("ffmpeg")
         ffprobe_path = self._resolve_tool_path("ffprobe")
         if ffmpeg_path is None or ffprobe_path is None:
-            raise ValueError("未找到 ffmpeg/ffprobe，请先安装或放到程序目录。")
+            raise ValueError("未找到可用的 ffmpeg/ffprobe，请查看日志确认依赖是否完整。")
 
         now = time.time()
         job_id = uuid.uuid4().hex
@@ -86,10 +90,21 @@ class VideoConvertService:
         with self._lock:
             self._jobs[job_id] = job
 
+        self._logger.info(
+            "Create job. job_id=%s files=%s source=%s output=%s ffmpeg=%s ffprobe=%s",
+            job_id,
+            len(files),
+            source,
+            target_dir,
+            ffmpeg_path,
+            ffprobe_path,
+        )
+
         worker = threading.Thread(
             target=self._run_job,
             args=(job_id, source, target_dir, files, ffmpeg_path, ffprobe_path, height, crf, preset, audio_bitrate),
             daemon=True,
+            name=f"convert-{job_id[:8]}",
         )
         worker.start()
         return job_id
@@ -113,6 +128,7 @@ class VideoConvertService:
         audio_bitrate: str,
     ) -> None:
         self._update_job(job_id, status="running", message="正在转换", progress=0.0)
+        self._logger.info("Job start. job_id=%s", job_id)
 
         durations = [self._probe_duration(ffprobe_path, path) for path in files]
         has_all_duration = all(d is not None and d > 0 for d in durations)
@@ -143,10 +159,10 @@ class VideoConvertService:
                         value = index / len(files)
                     else:
                         value = 0.0
-
                     self._update_job(job_id, progress=max(0.0, min(value, 1.0)))
 
                 self._convert_single_file(
+                    job_id=job_id,
                     ffmpeg_path=ffmpeg_path,
                     input_file=input_file,
                     output_file=output_file,
@@ -161,11 +177,7 @@ class VideoConvertService:
                     processed_duration += duration
 
                 completed = index + 1
-                self._update_job(
-                    job_id,
-                    processed_files=completed,
-                    progress=completed / len(files),
-                )
+                self._update_job(job_id, processed_files=completed, progress=completed / len(files))
 
             self._update_job(
                 job_id,
@@ -174,14 +186,17 @@ class VideoConvertService:
                 message="全部转换完成",
                 current_file=None,
             )
+            self._logger.info("Job completed. job_id=%s", job_id)
         except Exception as exc:
+            error_message = f"{exc} (日志: {get_log_file_path()})"
             self._update_job(
                 job_id,
                 status="failed",
                 message="转换失败",
-                error=str(exc),
+                error=error_message,
                 current_file=None,
             )
+            self._logger.exception("Job failed. job_id=%s error=%s", job_id, exc)
 
     def _update_job(self, job_id: str, **kwargs) -> None:
         with self._lock:
@@ -204,20 +219,49 @@ class VideoConvertService:
         return output_dir / relative.parent / f"{relative.stem}_{height}p.mp4"
 
     def _resolve_tool_path(self, tool_name: str) -> Path | None:
+        candidates: list[Path] = []
         from_path = shutil.which(tool_name)
         if from_path:
-            return Path(from_path)
+            candidates.append(Path(from_path))
 
         executable_dir = Path(sys.executable).resolve().parent
-        candidates = [
-            executable_dir / f"{tool_name}.exe",
-            Path(sys.prefix) / "Library" / "bin" / f"{tool_name}.exe",
-            Path(sys.prefix) / "Scripts" / f"{tool_name}.exe",
-        ]
+        candidates.extend(
+            [
+                executable_dir / f"{tool_name}.exe",
+                Path(sys.prefix) / "Library" / "bin" / f"{tool_name}.exe",
+                Path(sys.prefix) / "Scripts" / f"{tool_name}.exe",
+            ]
+        )
+
+        checked = set()
         for candidate in candidates:
-            if candidate.exists():
+            candidate = candidate.resolve()
+            if candidate in checked:
+                continue
+            checked.add(candidate)
+            if not candidate.exists():
+                continue
+            if self._is_tool_usable(candidate):
                 return candidate
+            self._logger.warning("Tool exists but not usable. tool=%s path=%s", tool_name, candidate)
+
+        self._logger.error("Tool not found or unusable. tool=%s candidates=%s", tool_name, candidates)
         return None
+
+    def _is_tool_usable(self, executable: Path) -> bool:
+        try:
+            result = subprocess.run(
+                [str(executable), "-version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return result.returncode == 0
+        except OSError:
+            return False
+        except Exception:
+            self._logger.exception("Tool check failed. executable=%s", executable)
+            return False
 
     def _probe_duration(self, ffprobe_path: Path, video_file: Path) -> float | None:
         cmd = [
@@ -232,15 +276,29 @@ class VideoConvertService:
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode != 0:
+            self._logger.warning("ffprobe failed. file=%s returncode=%s stderr=%s", video_file, result.returncode, result.stderr)
             return None
         try:
             duration = float(result.stdout.strip())
             return duration if duration > 0 else None
         except ValueError:
+            self._logger.warning("ffprobe duration parse failed. file=%s output=%s", video_file, result.stdout)
             return None
+
+    def _format_exit_code(self, return_code: int) -> str:
+        unsigned_code = return_code & 0xFFFFFFFF
+        signed_code = unsigned_code if unsigned_code < 0x80000000 else unsigned_code - 0x100000000
+
+        if unsigned_code == WINDOWS_DLL_NOT_FOUND_EXIT:
+            return (
+                "ffmpeg 启动失败（缺少 DLL 依赖，exit=0xC0000135）。"
+                "请确认 dist 目录包含 ffmpeg 依赖 DLL。"
+            )
+        return f"ffmpeg 退出码: {signed_code} (0x{unsigned_code:08X})"
 
     def _convert_single_file(
         self,
+        job_id: str,
         ffmpeg_path: Path,
         input_file: Path,
         output_file: Path,
@@ -275,6 +333,8 @@ class VideoConvertService:
             str(output_file),
         ]
 
+        self._logger.info("Run ffmpeg. job_id=%s input=%s output=%s cmd=%s", job_id, input_file, output_file, cmd)
+
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -282,6 +342,7 @@ class VideoConvertService:
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
 
         try:
@@ -304,4 +365,15 @@ class VideoConvertService:
             stderr_text = process.stderr.read() if process.stderr else ""
 
         if return_code != 0:
-            raise RuntimeError(stderr_text.strip() or f"ffmpeg 退出码: {return_code}")
+            msg = self._format_exit_code(return_code)
+            if stderr_text.strip():
+                self._logger.error("ffmpeg failed. job_id=%s stderr=%s", job_id, stderr_text.strip())
+            self._logger.error(
+                "ffmpeg failed. job_id=%s returncode=%s hex=0x%08X input=%s output=%s",
+                job_id,
+                return_code if return_code < 0x80000000 else return_code - 0x100000000,
+                return_code & 0xFFFFFFFF,
+                input_file,
+                output_file,
+            )
+            raise RuntimeError(msg)

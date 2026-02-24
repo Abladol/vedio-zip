@@ -6,3 +6,4 @@ dist/
 *.spec
 installer/Output/
 *.zip
+logs/

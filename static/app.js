@@ -1,5 +1,7 @@
-const sourceFileEl = document.getElementById("sourceFile");
-const sourceFolderEl = document.getElementById("sourceFolder");
+const sourcePathEl = document.getElementById("sourcePath");
+const sourceTypeEls = document.querySelectorAll("input[name='sourceType']");
+const pickSourceBtn = document.getElementById("pickSourceBtn");
+const pickOutputBtn = document.getElementById("pickOutputBtn");
 const outputDirEl = document.getElementById("outputDir");
 const heightEl = document.getElementById("height");
 const crfEl = document.getElementById("crf");
@@ -17,6 +19,16 @@ let timerId = null;
 
 function showError(message) {
   statusTextEl.textContent = `错误: ${message}`;
+}
+
+function getSourceType() {
+  const selected = Array.from(sourceTypeEls).find((el) => el.checked);
+  return selected ? selected.value : "source_file";
+}
+
+function updateSourcePlaceholder() {
+  const sourceType = getSourceType();
+  sourcePathEl.placeholder = sourceType === "source_file" ? "请选择视频文件" : "请选择视频文件夹";
 }
 
 async function postJson(url, payload) {
@@ -41,9 +53,11 @@ function updateProgress(value) {
 
 function setRunningState(running) {
   startBtn.disabled = running;
-  document.getElementById("pickFileBtn").disabled = running;
-  document.getElementById("pickFolderBtn").disabled = running;
-  document.getElementById("pickOutputBtn").disabled = running;
+  pickSourceBtn.disabled = running;
+  pickOutputBtn.disabled = running;
+  sourceTypeEls.forEach((el) => {
+    el.disabled = running;
+  });
 }
 
 async function pickPath(kind, targetEl) {
@@ -51,12 +65,6 @@ async function pickPath(kind, targetEl) {
     const result = await postJson("/api/pick-path", { kind });
     if (result.path) {
       targetEl.value = result.path;
-      if (targetEl === sourceFileEl) {
-        sourceFolderEl.value = "";
-      }
-      if (targetEl === sourceFolderEl) {
-        sourceFileEl.value = "";
-      }
     }
   } catch (err) {
     showError(err.message);
@@ -97,24 +105,28 @@ async function pollJob() {
   }
 }
 
-document.getElementById("pickFileBtn").addEventListener("click", async () => {
-  await pickPath("source_file", sourceFileEl);
+pickSourceBtn.addEventListener("click", async () => {
+  const sourceType = getSourceType();
+  await pickPath(sourceType, sourcePathEl);
 });
 
-document.getElementById("pickFolderBtn").addEventListener("click", async () => {
-  await pickPath("source_folder", sourceFolderEl);
-});
-
-document.getElementById("pickOutputBtn").addEventListener("click", async () => {
+pickOutputBtn.addEventListener("click", async () => {
   await pickPath("output_folder", outputDirEl);
 });
 
+sourceTypeEls.forEach((el) => {
+  el.addEventListener("change", () => {
+    sourcePathEl.value = "";
+    updateSourcePlaceholder();
+  });
+});
+
 startBtn.addEventListener("click", async () => {
-  const sourcePath = sourceFileEl.value || sourceFolderEl.value;
+  const sourcePath = sourcePathEl.value;
   const outputDir = outputDirEl.value;
 
   if (!sourcePath) {
-    showError("请先选择输入文件或输入文件夹");
+    showError("请先选择输入路径");
     return;
   }
   if (!outputDir) {
@@ -150,3 +162,5 @@ startBtn.addEventListener("click", async () => {
     showError(err.message);
   }
 });
+
+updateSourcePlaceholder();

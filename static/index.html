@@ -16,19 +16,21 @@
 
     <section class="panel">
       <div class="field-grid">
-        <label class="field">
-          <span>输入文件</span>
-          <div class="inline-controls">
-            <input id="sourceFile" type="text" placeholder="请选择视频文件" readonly />
-            <button id="pickFileBtn" type="button">选择文件</button>
+        <label class="field field-span-2">
+          <span>输入来源</span>
+          <div class="source-type">
+            <label>
+              <input type="radio" name="sourceType" value="source_file" checked />
+              文件
+            </label>
+            <label>
+              <input type="radio" name="sourceType" value="source_folder" />
+              文件夹
+            </label>
           </div>
-        </label>
-
-        <label class="field">
-          <span>输入文件夹</span>
           <div class="inline-controls">
-            <input id="sourceFolder" type="text" placeholder="请选择视频文件夹" readonly />
-            <button id="pickFolderBtn" type="button">选择文件夹</button>
+            <input id="sourcePath" type="text" placeholder="请选择视频文件" readonly />
+            <button id="pickSourceBtn" type="button">选择</button>
           </div>
         </label>
 

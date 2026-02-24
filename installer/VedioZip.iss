@@ -27,6 +27,7 @@ Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "
 Source: "..\dist\VedioZip.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\ffprobe.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\VedioZip.exe"

@@ -1,23 +1,19 @@
 # VedioZip
 
-VedioZip is an open-source Windows video conversion tool.
+English | [简体中文](README.zh-CN.md)
 
-- Full source code is included in this repository.
-- You can run from source in one command.
-- You can also download a portable executable or installer from GitHub Releases.
+VedioZip is an open-source Windows video conversion tool with a local web UI.
 
-## Source Code
+## Features
 
-- Backend API: `server.py`
-- Conversion engine: `video_service.py`
-- App launcher: `launcher.py`
-- Frontend UI: `static/`
-- Build scripts:
-  - `build_windows.ps1` (portable exe)
-  - `build_installer.ps1` (installer exe)
-- CI release workflow: `.github/workflows/release.yml`
+- Convert a single video file or a whole folder
+- Choose output directory
+- Set target resolution (for example: 320p)
+- Configure CRF, preset, and audio bitrate
+- Real-time conversion progress
+- Portable `.exe` and installer package support
 
-## Quick Start (Run from source)
+## Quick Start
 
 1. Create or update environment:
 
@@ -25,32 +21,24 @@ VedioZip is an open-source Windows video conversion tool.
 conda env update -n vediozip-ffmpeg -f environment.yml --prune
 ```
 
-2. Start app:
+2. Run locally:
 
 ```powershell
 .\run_dev.ps1
 ```
 
-The app opens in your browser automatically.
+The browser UI opens automatically.
 
-## Download and Use (No development environment required)
+## Download
 
-Go to **GitHub Releases** and download either:
+From GitHub Releases, download one of:
 
-- `VedioZip-portable-win64-<version>.zip`
-  - Unzip and run `VedioZip.exe`
-- `VedioZip-setup-win64-<version>.exe`
-  - Run installer and start from Start Menu/Desktop shortcut
+- `VedioZip-portable-win64-<version>.zip` (portable)
+- `VedioZip-setup-win64-<version>.exe` (installer)
 
-## How to Use in App
+## Build (Local)
 
-1. Choose input file or input folder.
-2. Choose output folder.
-3. Set target resolution (for example 320p).
-4. Click **Start Conversion**.
-5. Check real-time progress and current file status.
-
-## Build Portable Exe (Local)
+Build portable executable:
 
 ```powershell
 .\build_windows.ps1
@@ -61,18 +49,12 @@ Output:
 - `dist/VedioZip.exe`
 - `dist/ffmpeg.exe`
 - `dist/ffprobe.exe`
+- runtime DLLs in `dist/`
 
-## Build Installer Exe (Local)
-
-Install Inno Setup first:
+Build installer (requires Inno Setup):
 
 ```powershell
 choco install innosetup -y
-```
-
-Then build installer:
-
-```powershell
 .\build_installer.ps1 1.0.0
 ```
 
@@ -80,21 +62,37 @@ Output:
 
 - `installer/Output/VedioZip-Setup-1.0.0.exe`
 
-## Automated Release
+## GitHub Release Workflow
 
-When you push a tag like `v1.0.0`, GitHub Actions will:
-
-1. Build portable executable.
-2. Build installer executable.
-3. Create a GitHub Release.
-4. Upload both files to Release assets.
-
-Example:
+Push a tag to build and publish release assets automatically:
 
 ```powershell
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+Workflow file:
+
+- `.github/workflows/release.yml`
+
+## Troubleshooting
+
+Runtime logs:
+
+- source mode: `logs/vediozip.log`
+- packaged mode: `dist/logs/vediozip.log`
+
+If conversion fails, share the log file for diagnosis.
+
+## Project Structure
+
+- `launcher.py`: app entry point
+- `server.py`: FastAPI API and static hosting
+- `video_service.py`: conversion task logic
+- `static/`: frontend files
+- `build_windows.ps1`: build portable package
+- `build_installer.ps1`: build installer
+- `installer/VedioZip.iss`: Inno Setup script
 
 ## License
 

@@ -9,8 +9,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from app_logging import get_logger
 from video_service import VideoConvertService
 
+logger = get_logger("vediozip.server")
 app = FastAPI(title="VedioZip")
 service = VideoConvertService()
 
@@ -84,6 +86,15 @@ async def pick_path(request: PickPathRequest) -> dict:
 
 @app.post("/api/start")
 def start_job(request: StartJobRequest) -> dict:
+    logger.info(
+        "Start job request. source=%s output=%s height=%s crf=%s preset=%s audio=%s",
+        request.source_path,
+        request.output_dir,
+        request.height,
+        request.crf,
+        request.preset,
+        request.audio_bitrate,
+    )
     try:
         job_id = service.start_job(
             source_path=request.source_path,
@@ -94,10 +105,15 @@ def start_job(request: StartJobRequest) -> dict:
             audio_bitrate=request.audio_bitrate,
         )
     except ValueError as exc:
+        logger.warning("Start job validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("Start job failed unexpectedly")
+        raise HTTPException(status_code=500, detail="服务内部错误，请查看日志。")
 
     job = service.get_job(job_id)
     if job is None:
+        logger.error("Job created but not found. job_id=%s", job_id)
         raise HTTPException(status_code=500, detail="任务创建失败")
     return job
 

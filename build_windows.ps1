@@ -39,6 +39,16 @@ if (-not (Test-Path $ffmpeg) -or -not (Test-Path $ffprobe)) {
 Copy-Item $ffmpeg "dist\ffmpeg.exe" -Force
 Copy-Item $ffprobe "dist\ffprobe.exe" -Force
 
+$binDir = Join-Path $prefix "Library\bin"
+if (-not (Test-Path $binDir)) {
+  throw "Cannot find conda Library\\bin directory: $binDir"
+}
+
+Write-Host "==> Copy ffmpeg runtime DLLs to dist"
+Get-ChildItem $binDir -Filter *.dll | ForEach-Object {
+  Copy-Item $_.FullName (Join-Path "dist" $_.Name) -Force
+}
+
 Write-Host "==> Build completed"
 Write-Host "Output dir: dist"
 Write-Host "Run file : dist\$appName.exe"
